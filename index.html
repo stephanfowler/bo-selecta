@@ -15,9 +15,12 @@
   <body>
     <div id="selectors"></div>
     <script>
-        var selectors = _.chain(selectors)
+        var delimRx = new RegExp('[ \.\#\,\:]+'),
+
+            selectors = _.chain(selectors)
               .pairs()
               .sortBy()
+              .map(function(s) {return [tokenise(s[0], delimRx), s[1]]})
               .value(),
 
             elSelectors = React.createClass({
@@ -55,8 +58,7 @@
                         })
                         .reduce(function(acc, p, i) {
                             acc['_' + i] = React.createElement(elSelector, {
-                                selector: p[0],
-                                isUsed: p[1],
+                                selector: p,
                                 filter: filter
                             });
                             return acc;
@@ -68,14 +70,13 @@
 
             elSelector = React.createClass({
                 render: function() {
-                    var filter = this.props.filter,
-                        tokens = tokenise(this.props.selector, /[ \.\,\:]+/g);
+                    var filter = this.props.filter;
 
                     return React.DOM.div({
-                            className: this.props.isUsed ? 'used' : null
+                            className: this.props.selector[1] ? 'used' : null
                         },
-                        _.reduce(tokens, function(acc, k, i) {
-                            acc['_' + i] = i % 2 ? React.DOM.text({}, k) : React.createElement(elSelectorPart, {
+                        _.reduce(this.props.selector[0], function(acc, k, i) {
+                            acc['_' + i] = k.match(delimRx) ? React.DOM.span({}, k) : React.createElement(elSelectorPart, {
                                 part: k,
                                 filter: filter
                             });
