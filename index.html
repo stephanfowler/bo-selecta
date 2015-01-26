@@ -6,76 +6,127 @@
     <script src="data/css-selectors.js"></script>
     <style>
       body { font-family: monospace;}
-      .active {font-weight: bold;}
+      #selectors {color:#933;}
+      #selectors span {cursor: pointer;}
+      #selectors span:hover , #selectors span.active {font-weight: bold;}
+      #selectors .used {color: #ada;}
     </style>
   </head>
   <body>
     <div id="selectors"></div>
     <script>
-      var elSelectors = React.createClass({
-          getInitialState: function () {
-              return { filter: window.location.hash.slice(1) };
-          },
-          reFilter: function (e) {
-              var str = e.target.innerText;
+        var selectors = _.chain(selectors)
+              .pairs()
+              .sortBy()
+              .value(),
 
-              str = str === this.state.filter ? '' : str;
-              this.setState({ filter: str });
-              setHash(str);
-          },
-          render: function() {
-              var filter = this.state.filter;
+            elSelectors = React.createClass({
+                getInitialState: function() {
+                    window.onhashchange = (function() {
+                        this.setState({
+                            filter: getHash()
+                        });
+                    }).bind(this);
 
-              return React.DOM.div({onClick: this.reFilter}, 
-                  _.chain(selectors)
-                  .map(function(v, k) {
-                      return v && (!filter || k.indexOf(filter) > -1) ? [k, v] : false;
-                  }, {})
-                  .compact()
-                  .reduce(function(acc, p) {
-                      acc[p[0]] = React.createElement(elSelector, {selector: p[0], filter: filter});
-                      return acc;
-                  }, {})
-                  .value()
-              );
-          }
-        }), 
+                    return {
+                        filter: getHash()
+                    };
+                },
+                handleClick: function(e) {
+                    var filter = e.target.innerText;
 
-        elSelector = React.createClass({
-          render: function() {
-              var filter = this.props.filter,
-                  spans = this.props.selector.split(' ');
- 
-              return React.DOM.div({}, 
-                _.reduce(spans, function(acc, k) {
-                  acc[k] = React.createElement(elPart, {part: k, filter: filter});
-                  acc[k+'_'] = React.DOM.text({}, ' ');
-                  return acc;
-                }, {})
-              );
-          }
-        }),
+                    if (e.target.tagName.toLowerCase() === 'span') {
+                        filter = filter === this.state.filter ? '' : filter;
+                        this.setState({
+                            filter: filter
+                        });
+                        setHash(filter);
+                    }
+                },
+                render: function() {
+                    var filter = this.state.filter;
 
-        elPart = React.createClass({
-          render: function() {
-            var attribs = {};
+                    return React.DOM.div({
+                            onClick: this.handleClick
+                        },
+                        _.chain(selectors)
+                        .filter(function(p) {
+                            return !filter || p[0].indexOf(filter) > -1;
+                        })
+                        .reduce(function(acc, p, i) {
+                            acc['_' + i] = React.createElement(elSelector, {
+                                selector: p[0],
+                                isUsed: p[1],
+                                filter: filter
+                            });
+                            return acc;
+                        }, {})
+                        .value()
+                    );
+                }
+            }),
 
-            if (this.props.part === this.props.filter) {
-                attribs.className = 'active';
+            elSelector = React.createClass({
+                render: function() {
+                    var filter = this.props.filter,
+                        tokens = tokenise(this.props.selector, /[ \.\,\:]+/g);
+
+                    return React.DOM.div({
+                            className: this.props.isUsed ? 'used' : null
+                        },
+                        _.reduce(tokens, function(acc, k, i) {
+                            acc['_' + i] = i % 2 ? React.DOM.text({}, k) : React.createElement(elSelectorPart, {
+                                part: k,
+                                filter: filter
+                            });
+                            return acc;
+                        }, {})
+                    );
+                }
+            }),
+
+            elSelectorPart = React.createClass({
+                render: function() {
+                    return React.DOM.span({
+                        className: this.props.part === this.props.filter ? 'active' : null
+                    }, this.props.part);
+                }
+            });
+
+        function getHash() {
+            return window.location.hash.slice(1);
+        }
+
+        function setHash(filter) {
+            window.location.hash = filter;
+        }
+
+        function tokenise(text, regex) {
+            var token, index, result = [];
+
+            while (text !== '') {
+                regex.lastIndex = 0;
+                token = regex.exec(text);
+                if (token === null) {
+                    break;
+                }
+                index = token.index;
+                if (token[0].length === 0) {
+                    index = 1;
+                }
+                result.push(text.substr(0, index));
+                result.push(token[0]);
+                index = index + token[0].length;
+                text = text.slice(index);
             }
-            return React.DOM.span(attribs, this.props.part);
-          }
-        });
+            result.push(text);
+            return result;
+        }
 
-
-      function setHash(str) {
-         window.location.hash = str;
-      }
-
-      React.render(
-        React.createElement(elSelectors),
-        document.getElementById('selectors')
-      );
+        React.render(
+            React.createElement(elSelectors),
+            document.getElementById('selectors')
+        );
     </script>
   </body>
 </html>
