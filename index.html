@@ -15,24 +15,28 @@
   <body>
     <div id="selectors"></div>
     <script>
-        var delimRx = new RegExp('[ \.\#\,\:]+'),
+        var delimRx = new RegExp('[^a-z0-9\-\_]+', 'i'),
 
             selectors = _.chain(selectors)
-              .pairs()
-              .sortBy()
-              .map(function(s) {return [tokenise(s[0], delimRx), s[1]]})
-              .value(),
+                .pairs()
+                .sortBy()
+                .map(function(s) {
+                    return [tokenise(s[0], delimRx), s[1]]
+                })
+                .value(),
 
             elSelectors = React.createClass({
                 getInitialState: function() {
                     window.onhashchange = (function() {
                         this.setState({
-                            filter: getHash()
+                            filter: getHashParams().filter,
+                            starts: getHashParams().starts
                         });
                     }).bind(this);
 
                     return {
-                        filter: getHash()
+                        filter: getHashParams().filter,
+                        starts: getHashParams().starts
                     };
                 },
                 handleClick: function(e) {
@@ -43,18 +47,22 @@
                         this.setState({
                             filter: filter
                         });
-                        setHash(filter);
+                        setHashParam('filter', filter);
                     }
                 },
                 render: function() {
-                    var filter = this.state.filter;
+                    var filter = this.state.filter,
+                        starts = this.state.starts;
 
                     return React.DOM.div({
                             onClick: this.handleClick
                         },
                         _.chain(selectors)
                         .filter(function(p) {
-                            return !filter || p[0].indexOf(filter) > -1;
+                            var tokens = p[0];
+
+                            return (!filter || tokens.indexOf(filter) > -1) && 
+                                   (!starts || (tokens[0] || '').indexOf(starts) === 0 || (tokens[1] || '').indexOf(starts) === 0);
                         })
                         .reduce(function(acc, p, i) {
                             acc['_' + i] = React.createElement(elSelector, {
@@ -94,12 +102,17 @@
                 }
             });
 
-        function getHash() {
-            return window.location.hash.slice(1);
-        }
+        function setHashParam(key, val) {
+            var params = getHashParams();
 
-        function setHash(filter) {
-            window.location.hash = filter;
+            params[key] = val || '';
+
+            window.location.hash = _.reduce(params, function(acc, v, k) {
+                 acc.push(k + '=' + encodeURIComponent(v));
+                 return acc;   
+            }, []).join('&');
+
+            console.log(getHashParams());
         }
 
         function tokenise(text, regex) {
@@ -115,7 +128,9 @@
                 if (token[0].length === 0) {
                     index = 1;
                 }
-                result.push(text.substr(0, index));
+                if (index) {
+                    result.push(text.substr(0, index));
+                };
                 result.push(token[0]);
                 index = index + token[0].length;
                 text = text.slice(index);
@@ -123,6 +138,27 @@
             result.push(text);
             return result;
         }
+
+        function getHashParams() {
+            var result = {};
+
+            _.chain(window.location.hash.slice(1).split('&'))
+                .filter(function(kv) {
+                    return kv; })
+
+                .map(function(kv) {
+                    return kv.split('='); })
+
+                .map(function(kv) {
+                    var key = kv[0],
+                        value = kv[1] === undefined ? undefined : decodeURIComponent(kv[1].replace(/\+/g, ' '));
+
+                    result[key] = value;
+                });
+            return result;
+        };
+
+        selectors.slice(0, 100).forEach(function(s) {console.log(s[0]);});
 
         React.render(
             React.createElement(elSelectors),
